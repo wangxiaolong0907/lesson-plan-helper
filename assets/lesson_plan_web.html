@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>教案自动生成助手</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        @media (max-width: 900px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .card h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+            font-size: 0.95em;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .btn-generate {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn-generate:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-generate:active {
+            transform: translateY(0);
+        }
+
+        .btn-generate:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .output-container {
+            min-height: 400px;
+        }
+
+        .output-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            min-height: 350px;
+            color: #999;
+            text-align: center;
+        }
+
+        .output-placeholder svg {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .output-content {
+            display: none;
+        }
+
+        .output-content.active {
+            display: block;
+        }
+
+        .output-content .markdown {
+            line-height: 1.8;
+            color: #333;
+        }
+
+        .output-content .markdown h1,
+        .output-content .markdown h2,
+        .output-content .markdown h3 {
+            color: #667eea;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+
+        .output-content .markdown h1 {
+            font-size: 1.8em;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .output-content .markdown h2 {
+            font-size: 1.5em;
+        }
+
+        .output-content .markdown h3 {
+            font-size: 1.2em;
+        }
+
+        .output-content .markdown ul,
+        .output-content .markdown ol {
+            margin-left: 25px;
+            margin-bottom: 15px;
+        }
+
+        .output-content .markdown li {
+            margin-bottom: 5px;
+        }
+
+        .output-content .markdown strong {
+            color: #764ba2;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background-color: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .error.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📚 教案自动生成助手</h1>
+            <p>输入课程信息，快速生成结构化教案</p>
+        </header>
+
+        <div class="main-content">
+            <!-- 输入表单 -->
+            <div class="card">
+                <h2>📝 课程信息</h2>
+                <form id="lessonForm">
+                    <div class="form-group">
+                        <label for="course_topic">课程主题 <span style="color: red;">*</span></label>
+                        <input 
+                            type="text" 
+                            id="course_topic" 
+                            name="course_topic" 
+                            placeholder="例如：分数的初步认识"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="class_hours">课时 <span style="color: red;">*</span></label>
+                        <input 
+                            type="text" 
+                            id="class_hours" 
+                            name="class_hours" 
+                            placeholder="例如：2课时，90分钟"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="teaching_objectives">教学目标 <span style="color: red;">*</span></label>
+                        <textarea 
+                            id="teaching_objectives" 
+                            name="teaching_objectives" 
+                            placeholder="请描述教学目标，例如：学生能够理解分数的概念，掌握分数的读写方法，并能进行简单的分数比较。"
+                            required
+                        ></textarea>
+                    </div>
+
+                    <button type="submit" class="btn-generate" id="generateBtn">
+                        ✨ 生成教案
+                    </button>
+                </form>
+
+                <div class="error" id="error"></div>
+            </div>
+
+            <!-- 输出区域 -->
+            <div class="card output-container">
+                <h2>📋 生成结果</h2>
+                
+                <!-- 占位符 -->
+                <div class="output-placeholder" id="placeholder">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <p>请填写课程信息后点击"生成教案"<br>教案将在这里显示</p>
+                </div>
+
+                <!-- 加载中 -->
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>正在生成教案，请稍候...</p>
+                </div>
+
+                <!-- 输出内容 -->
+                <div class="output-content" id="output">
+                    <div class="markdown" id="markdown"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('lessonForm');
+        const generateBtn = document.getElementById('generateBtn');
+        const placeholder = document.getElementById('placeholder');
+        const loading = document.getElementById('loading');
+        const output = document.getElementById('output');
+        const markdown = document.getElementById('markdown');
+        const error = document.getElementById('error');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            // 获取表单数据
+            const course_topic = document.getElementById('course_topic').value.trim();
+            const class_hours = document.getElementById('class_hours').value.trim();
+            const teaching_objectives = document.getElementById('teaching_objectives').value.trim();
+
+            // 验证输入
+            if (!course_topic || !class_hours || !teaching_objectives) {
+                showError('请完整填写所有字段');
+                return;
+            }
+
+            // 构建prompt
+            const prompt = `请根据以下信息生成一份结构化教案：
+
+**课程主题**：${course_topic}
+**课时**：${class_hours}
+**教学目标**：${teaching_objectives}`;
+
+            // 显示加载状态
+            placeholder.style.display = 'none';
+            output.classList.remove('active');
+            loading.classList.add('active');
+            generateBtn.disabled = true;
+            error.classList.remove('active');
+
+            try {
+                // 调用Agent API
+                const response = await fetch('/stream_run', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        type: "query",
+                        session_id: "lesson_plan_" + Date.now(),
+                        message: "生成教案",
+                        content: {
+                            query: {
+                                prompt: [{
+                                    type: "text",
+                                    content: {
+                                        text: prompt
+                                    }
+                                }]
+                            }
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                // 读取SSE流
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullContent = "";
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ') && line.trim() !== 'data:') {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                // 只提取answer字段的内容
+                                if (data.content && data.content.answer) {
+                                    fullContent += data.content.answer;
+                                }
+                            } catch (e) {
+                                // 忽略解析错误
+                            }
+                        }
+                    }
+                }
+
+                // 如果没有获取到内容，显示错误
+                if (!fullContent || fullContent.trim() === '') {
+                    throw new Error('未能生成教案内容，请重试');
+                }
+
+                // 显示结果
+                markdown.innerHTML = formatMarkdown(fullContent);
+                loading.classList.remove('active');
+                output.classList.add('active');
+
+            } catch (err) {
+                showError('生成教案时出错：' + err.message);
+                loading.classList.remove('active');
+                placeholder.style.display = 'flex';
+            } finally {
+                generateBtn.disabled = false;
+            }
+        });
+
+        function showError(message) {
+            error.textContent = message;
+            error.classList.add('active');
+        }
+
+        function formatMarkdown(text) {
+            // 简单的Markdown格式化
+            return text
+                .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+                .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+                .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/^- (.*$)/gim, '<li>$1</li>')
+                .replace(/(\n<li>.*<\/li>\n)+/g, '<ul>$&</ul>')
+                .replace(/^\d+\. (.*$)/gim, '<li>$1</li>')
+                .replace(/(\n<li>.*<\/li>\n)+/g, '<ol>$&</ol>')
+                .replace(/\n/g, '<br>');
+        }
+    </script>
+</body>
+</html>
