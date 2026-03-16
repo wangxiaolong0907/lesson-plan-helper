@@ -62,38 +62,47 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # API 配置
+    # API 配置 - 优先从环境变量读取
     st.markdown("### 🔧 API 配置")
+    
+    # 从环境变量读取默认值（如果在 Streamlit Cloud 中配置了 Secrets）
+    default_api_key = os.getenv("DOUBAO_API_KEY", "")
+    default_base_url = os.getenv("DOUBAO_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3")
+    default_model = os.getenv("DOUBAO_MODEL", "doubao-pro-32k")
+    
+    # 显示配置说明
+    if default_api_key:
+        st.success("✅ 已使用预配置的火山方舟（豆包）模型")
+        st.info("API Key 已配置，无需手动输入")
+    else:
+        st.info("💡 提示：在 Streamlit Cloud Secrets 中配置 API Key 可避免每次输入")
+    
     st.markdown("""
-    **说明：**
+    **当前使用：火山方舟（豆包）**
     
-    在下方输入您的 API 凭证，用于调用大模型生成教案。
-    
-    **支持的平台：**
-    - OpenAI
-    - 火山方舟（豆包）
-    - 其他 OpenAI 兼容的 API
+    如需修改，请在下方输入：
     """)
     
     api_key = st.text_input(
         "API Key",
-        type="password",
-        help="输入您的 API Key",
-        placeholder="sk-..."
+        value=default_api_key,
+        type="password" if not default_api_key else "default",
+        help="火山方舟 API Key",
+        placeholder="pat_xxxxxxxxxx"
     )
     
     base_url = st.text_input(
         "Base URL",
-        value="https://api.openai.com/v1",
-        help="API 的 Base URL",
-        placeholder="https://api.openai.com/v1"
+        value=default_base_url,
+        help="火山方舟 API Base URL",
+        placeholder="https://ark.cn-beijing.volces.com/api/v3"
     )
     
     model = st.text_input(
         "模型名称",
-        value="gpt-4o-mini",
-        help="要使用的模型名称",
-        placeholder="gpt-4o-mini"
+        value=default_model,
+        help="豆包模型名称",
+        placeholder="doubao-pro-32k"
     )
     
     st.markdown("---")
@@ -348,9 +357,9 @@ with st.expander("💡 使用说明"):
     ### 如何使用
     
     1. **配置 API**：
-       - 在左侧边栏输入您的 API Key
-       - 输入 Base URL（默认是 OpenAI 的）
-       - 输入模型名称（默认是 gpt-4o-mini）
+       - API Key 已预配置火山方舟（豆包），直接使用即可
+       - Base URL: `https://ark.cn-beijing.volces.com/api/v3`
+       - Model: `doubao-pro-32k`
     
     2. **输入课程信息**：
        - 课程主题：例如"分数的加减法"
@@ -362,22 +371,47 @@ with st.expander("💡 使用说明"):
        - 等待生成完成
        - 可以下载为 Markdown 文件
     
-    ### 支持的 API
+    ### 当前配置
     
-    - **OpenAI**: 
-      - Base URL: `https://api.openai.com/v1`
-      - Model: `gpt-4o-mini`, `gpt-4o`, `gpt-3.5-turbo`
+    - **模型**：火山方舟（豆包）
+    - **Base URL**：https://ark.cn-beijing.volces.com/api/v3
+    - **默认模型**：doubao-pro-32k
     
-    - **火山方舟（豆包）**:
-      - Base URL: `https://ark.cn-beijing.volces.com/api/v3`
-      - Model: `doubao-pro-32k`, `doubao-pro-256k`
+    ### 可用的豆包模型
     
-    - **其他兼容 OpenAI 的 API**:
-      - 输入相应的 Base URL 和模型名称
+    - `doubao-pro-32k` - 专业版，支持32K上下文（推荐）
+    - `doubao-pro-256k` - 专业版长文本，支持256K上下文
+    - `doubao-lite-32k` - 轻量版，响应更快
+    
+    ### 如何获取火山方舟 API Key
+    
+    1. 访问：https://console.volcengine.com/ark
+    2. 注册/登录火山引擎账号
+    3. 进入"API 密钥管理"
+    4. 创建 API Key
+    5. 复制保存（注意：只显示一次）
+    
+    ### 在 Streamlit Cloud 中配置 Secrets
+    
+    如果你想避免每次输入 API Key，可以在 Streamlit Cloud 中配置：
+    
+    1. 进入你的应用
+    2. 点击 **Settings** → **Secrets**
+    3. 添加以下配置：
+       ```
+       DOUBAO_API_KEY = pat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+       DOUBAO_BASE_URL = https://ark.cn-beijing.volces.com/api/v3
+       DOUBAO_MODEL = doubao-pro-32k
+       ```
+    4. 点击 **Save**
+    5. 重新部署应用
+    
+    配置后，应用会自动使用这些预配置的值，无需手动输入。
     
     ### 注意事项
     
-    - API Key 不会保存，只在当前会话使用
-    - 生成时间取决于模型响应速度
-    - 建议使用较新的模型以获得更好的效果
+    - API Key 在 Secrets 中安全存储，不会暴露
+    - 生成时间取决于豆包模型的响应速度
+    - 豆包模型在中文理解方面表现优秀
+    - 建议使用 doubao-pro-32k 以获得最佳效果
     """)
