@@ -1,5 +1,5 @@
 """
-教案自动生成助手 - Streamlit 版本
+教案自动生成助手 - Streamlit 版本（支持 Coze API）
 """
 
 import streamlit as st
@@ -230,48 +230,112 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # API 配置 - 优先从环境变量读取
+    # API 配置 - 支持多种平台
     st.markdown("### 🔧 API 配置")
     
-    # 从环境变量读取默认值（如果在 Streamlit Cloud 中配置了 Secrets）
-    default_api_key = os.getenv("DOUBAO_API_KEY", "")
-    default_base_url = os.getenv("DOUBAO_BASE_URL", "https://ark.cn-beijing.volces.com/api/v3")
-    default_model = os.getenv("DOUBAO_MODEL", "doubao-pro-32k")
+    # 平台选择
+    platform = st.selectbox(
+        "选择平台",
+        ["Coze（扣子）", "OpenAI", "火山方舟", "自定义"],
+        help="选择使用的 AI 平台"
+    )
+    
+    # 根据平台设置默认值
+    if platform == "Coze（扣子）":
+        default_api_key = os.getenv("COZE_API_KEY", "")
+        default_base_url = os.getenv("COZE_BASE_URL", "https://api.coze.cn/v1")
+        default_model = os.getenv("COZE_MODEL", "coze-pro")
+        st.success("✅ 已切换到 Coze（扣子）平台")
+    elif platform == "OpenAI":
+        default_api_key = os.getenv("OPENAI_API_KEY", "")
+        default_base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+        default_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+        st.info("💡 已切换到 OpenAI 平台")
+    elif platform == "火山方舟":
+        default_api_key = os.getenv("DOUBAO_API_KEY", "")
+        default_base_url = os.getenv("DOUBAO_BASE_URL", "https://ark.cn-beijing.volces.com/v3")
+        default_model = os.getenv("DOUBAO_MODEL", "doubao-pro-32k")
+        st.warning("⚠️ 已切换到火山方舟平台")
+    else:
+        default_api_key = ""
+        default_base_url = ""
+        default_model = ""
     
     # 显示配置说明
     if default_api_key:
-        st.success("✅ 已使用预配置的火山方舟（豆包）模型")
-        st.info("API Key 已配置，无需手动输入")
+        st.info("✅ API Key 已配置，无需手动输入")
     else:
-        st.info("💡 提示：在 Streamlit Cloud Secrets 中配置 API Key 可避免每次输入")
+        st.info("💡 请在下方的 API Key 输入框中输入您的 API Key")
     
-    st.markdown("""
-    **当前使用：火山方舟（豆包）**
+    st.markdown("---")
     
-    如需修改，请在下方输入：
-    """)
-    
+    # API 输入
     api_key = st.text_input(
         "API Key",
         value=default_api_key,
         type="password" if not default_api_key else "default",
-        help="火山方舟 API Key",
-        placeholder="pat_xxxxxxxxxx"
+        help="输入您的 API Key",
+        placeholder="pat_xxxxxxxxxx 或 sk-xxxxxxxxx"
     )
     
     base_url = st.text_input(
         "Base URL",
         value=default_base_url,
-        help="火山方舟 API Base URL",
-        placeholder="https://ark.cn-beijing.volces.com/api/v3"
+        help="API Base URL",
+        placeholder="https://api.coze.cn/v1"
     )
     
     model = st.text_input(
-        "模型名称",
+        "模型名称 / Bot ID",
         value=default_model,
-        help="豆包模型名称",
-        placeholder="doubao-pro-32k"
+        help="模型名称或 Bot ID",
+        placeholder="coze-pro 或 bot_id"
     )
+    
+    # 平台说明
+    st.markdown("---")
+    st.markdown("### 📋 平台说明")
+    
+    if platform == "Coze（扣子）":
+        st.markdown("""
+        **Coze（扣子）配置：**
+        
+        1. 访问：https://www.coze.cn/open/api
+        2. 获取 API Key
+        3. Base URL: `https://api.coze.cn/v1`
+        4. 模型名称：`coze-pro` 或 Bot ID
+        
+        **优势：**
+        - ✅ 免费额度
+        - ✅ 中文优化
+        - ✅ 配置简单
+        """)
+    elif platform == "OpenAI":
+        st.markdown("""
+        **OpenAI 配置：**
+        
+        1. 访问：https://platform.openai.com/api-keys
+        2. 获取 API Key
+        3. Base URL: `https://api.openai.com/v1`
+        4. 模型名称：`gpt-4o-mini`
+        
+        **优势：**
+        - ✅ 最稳定
+        - ✅ 效果最好
+        - ✅ 文档完善
+        """)
+    elif platform == "火山方舟":
+        st.markdown("""
+        **火山方舟配置：**
+        
+        1. 访问：https://console.volcengine.com/ark
+        2. 获取 API Key
+        3. Base URL: `https://ark.cn-beijing.volces.com/v3`
+        4. 模型名称：`doubao-pro-32k`
+        
+        **注意：**
+        ⚠️ 配置较复杂，建议使用 Coze 或 OpenAI
+        """)
     
     st.markdown("---")
     st.markdown("""
@@ -348,7 +412,10 @@ if generate_clicked:
                 
             except Exception as e:
                 st.error(f"❌ 生成失败：{str(e)}")
-                st.info("💡 请检查 API Key 和 Base URL 是否正确")
+                st.info(f"💡 当前使用平台：{platform}")
+                st.info("💡 请检查 API Key、Base URL 和模型名称是否正确")
+                if platform == "火山方舟":
+                    st.warning("⚠️ 火山方舟配置较复杂，建议切换到 Coze 或 OpenAI")
 
 
 # 使用说明
@@ -356,62 +423,70 @@ with st.expander("💡 使用说明"):
     st.markdown("""
     ### 如何使用
     
-    1. **配置 API**：
-       - API Key 已预配置火山方舟（豆包），直接使用即可
-       - Base URL: `https://ark.cn-beijing.volces.com/api/v3`
-       - Model: `doubao-pro-32k`
+    1. **选择平台**：
+       - 在左侧边栏选择使用的 AI 平台
+       - 推荐：Coze（扣子）或 OpenAI
     
-    2. **输入课程信息**：
+    2. **配置 API**：
+       - 输入 API Key
+       - 输入 Base URL（会自动填充默认值）
+       - 输入模型名称（会自动填充默认值）
+    
+    3. **输入课程信息**：
        - 课程主题：例如"分数的加减法"
        - 课时：例如"2课时（90分钟）"
        - 教学目标：详细描述教学目标
     
-    3. **生成教案**：
+    4. **生成教案**：
        - 点击"✨ 生成教案"按钮
        - 等待生成完成
        - 可以下载为 Markdown 文件
     
-    ### 当前配置
+    ### 平台对比
     
-    - **模型**：火山方舟（豆包）
-    - **Base URL**：https://ark.cn-beijing.volces.com/api/v3
-    - **默认模型**：doubao-pro-32k
+    | 平台 | 免费额度 | 中文支持 | 稳定性 | 推荐度 |
+    |------|---------|---------|--------|--------|
+    | **Coze（扣子）** | ✅ 有 | ✅ 优秀 | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
+    | **OpenAI** | ⚠️ 付费 | ✅ 优秀 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
+    | **火山方舟** | ✅ 有 | ✅ 优秀 | ⭐⭐⭐ | ⭐⭐ |
     
-    ### 可用的豆包模型
+    ### 如何获取 Coze API Key
     
-    - `doubao-pro-32k` - 专业版，支持32K上下文（推荐）
-    - `doubao-pro-256k` - 专业版长文本，支持256K上下文
-    - `doubao-lite-32k` - 轻量版，响应更快
+    1. 访问：https://www.coze.cn/open/api
+    2. 登录/注册 Coze 账号
+    3. 点击"个人访问令牌"
+    4. 创建令牌
+    5. 复制保存
     
-    ### 如何获取火山方舟 API Key
+    ### Coze 配置示例
     
-    1. 访问：https://console.volcengine.com/ark
-    2. 注册/登录火山引擎账号
-    3. 进入"API 密钥管理"
-    4. 创建 API Key
-    5. 复制保存（注意：只显示一次）
+    ```
+    平台: Coze（扣子）
+    API Key: pat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    Base URL: https://api.coze.cn/v1
+    模型: coze-pro
+    ```
     
-    ### 在 Streamlit Cloud 中配置 Secrets
+    ### 如何获取 OpenAI API Key
     
-    如果你想避免每次输入 API Key，可以在 Streamlit Cloud 中配置：
+    1. 访问：https://platform.openai.com/api-keys
+    2. 注册/登录 OpenAI 账号
+    3. 点击 "Create new secret key"
+    4. 复制保存
     
-    1. 进入你的应用
-    2. 点击 **Settings** → **Secrets**
-    3. 添加以下配置：
-       ```
-       DOUBAO_API_KEY = pat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-       DOUBAO_BASE_URL = https://ark.cn-beijing.volces.com/api/v3
-       DOUBAO_MODEL = doubao-pro-32k
-       ```
-    4. 点击 **Save**
-    5. 重新部署应用
+    ### OpenAI 配置示例
     
-    配置后，应用会自动使用这些预配置的值，无需手动输入。
+    ```
+    平台: OpenAI
+    API Key: sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    Base URL: https://api.openai.com/v1
+    模型: gpt-4o-mini
+    ```
     
     ### 注意事项
     
-    - API Key 在 Secrets 中安全存储，不会暴露
-    - 生成时间取决于豆包模型的响应速度
-    - 豆包模型在中文理解方面表现优秀
-    - 建议使用 doubao-pro-32k 以获得最佳效果
+    - Coze 有免费额度，适合测试和日常使用
+    - OpenAI 需要付费，但效果最稳定
+    - 火山方舟配置复杂，不推荐新手使用
+    - API Key 请妥善保管，不要泄露
     """)
