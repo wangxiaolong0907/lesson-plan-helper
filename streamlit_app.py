@@ -224,6 +224,10 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# 初始化 session state（用于隐藏 API 配置）
+if "api_config_hidden" not in st.session_state:
+    st.session_state.api_config_hidden = True
+
 # 侧边栏
 with st.sidebar:
     st.markdown("""
@@ -275,30 +279,41 @@ with st.sidebar:
         default_endpoint = ""
         default_model = ""
     
-    st.markdown("---")
+    # 检查是否已配置 API Key
+    is_configured = bool(default_api_key and default_endpoint and default_model)
     
-    # API 输入
-    api_key = st.text_input(
-        "API Key",
-        value=default_api_key,
-        type="password" if not default_api_key else "default",
-        help="输入您的 API Key",
-        placeholder="sk-xxxxxxxxx"
-    )
-    
-    endpoint_url = st.text_input(
-        "API 端点 URL",
-        value=default_endpoint,
-        help="完整的 API 端点 URL",
-        placeholder="https://api.xxxx.com/v1/chat/completions"
-    )
-    
-    model = st.text_input(
-        "模型名称",
-        value=default_model,
-        help="模型名称",
-        placeholder="model-name"
-    )
+    # 根据配置状态显示信息
+    if is_configured:
+        # 已配置：显示成功状态，不显示输入框
+        st.success("✅ API 配置已完成")
+        st.info("💡 API 配置已自动加载，可以直接生成教案")
+        # 使用环境变量值
+        api_key = default_api_key
+        endpoint_url = default_endpoint
+        model = default_model
+    else:
+        # 未配置：显示提示，引导用户配置 Secrets
+        st.error("❌ 未检测到 API 配置")
+        st.warning("""
+        请在 Streamlit Cloud 中配置 Secrets：
+        
+        1. 进入应用的 Settings → Secrets
+        2. 添加以下配置：
+        
+        ```
+        DEEPSEEK_API_KEY = sk-xxxxxxxxxxxxxxxxxxxx
+        DEEPSEEK_ENDPOINT = https://api.deepseek.com/chat/completions
+        DEEPSEEK_MODEL = deepseek-chat
+        ```
+        
+        3. 保存并重新部署应用
+        
+        💡 配置后 API Key 不会显示，完全隐藏
+        """)
+        # 设置为空值，防止误用
+        api_key = ""
+        endpoint_url = ""
+        model = ""
     
     st.markdown("---")
     st.markdown("### 💡 快速配置")
