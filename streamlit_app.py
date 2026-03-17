@@ -1,5 +1,5 @@
 """
-教案自动生成助手 - Streamlit 版本（支持 Coze API）
+教案自动生成助手 - Streamlit 版本（支持 DeepSeek）
 """
 
 import streamlit as st
@@ -14,11 +14,11 @@ def generate_lesson_plan(
     class_hours: str,
     teaching_objectives: str,
     api_key: str,
-    base_url: str,
+    endpoint_url: str,
     model: str
 ) -> str:
     """
-    使用 OpenAI 兼容的 API 生成教案
+    使用 API 生成教案
     """
     # 系统提示词
     system_prompt = """# 角色定义
@@ -145,8 +145,6 @@ def generate_lesson_plan(
 **教学目标**：{teaching_objectives}"""
 
     # 调用 API
-    url = f"{base_url.rstrip('/')}/chat/completions"
-    
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json"
@@ -165,14 +163,21 @@ def generate_lesson_plan(
             }
         ],
         "temperature": 0.7,
-        "max_tokens": 4000
+        "max_tokens": 4000,
+        "stream": False
     }
     
-    response = requests.post(url, headers=headers, json=data, timeout=60)
+    response = requests.post(endpoint_url, headers=headers, json=data, timeout=60)
     response.raise_for_status()
     
     result = response.json()
-    return result["choices"][0]["message"]["content"]
+    
+    # 标准格式（OpenAI 兼容）
+    if "choices" in result and len(result["choices"]) > 0:
+        return result["choices"][0]["message"]["content"]
+    
+    # 如果格式不标准，返回原始内容
+    return str(result)
 
 
 # 页面配置
@@ -230,42 +235,45 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # API 配置 - 支持多种平台
+    # API 配置
     st.markdown("### 🔧 API 配置")
     
-    # 平台选择
+    # 平台选择 - DeepSeek 为默认
     platform = st.selectbox(
         "选择平台",
-        ["Coze（扣子）", "OpenAI", "火山方舟", "自定义"],
+        ["DeepSeek（推荐）", "通义千问", "Groq（免费）", "自定义"],
         help="选择使用的 AI 平台"
     )
     
     # 根据平台设置默认值
-    if platform == "Coze（扣子）":
-        default_api_key = os.getenv("COZE_API_KEY", "")
-        default_base_url = os.getenv("COZE_BASE_URL", "https://api.coze.cn/v1")
-        default_model = os.getenv("COZE_MODEL", "coze-pro")
-        st.success("✅ 已切换到 Coze（扣子）平台")
-    elif platform == "OpenAI":
-        default_api_key = os.getenv("OPENAI_API_KEY", "")
-        default_base_url = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
-        default_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-        st.info("💡 已切换到 OpenAI 平台")
-    elif platform == "火山方舟":
-        default_api_key = os.getenv("DOUBAO_API_KEY", "")
-        default_base_url = os.getenv("DOUBAO_BASE_URL", "https://ark.cn-beijing.volces.com/v3")
-        default_model = os.getenv("DOUBAO_MODEL", "doubao-pro-32k")
-        st.warning("⚠️ 已切换到火山方舟平台")
+    if platform == "DeepSeek（推荐）":
+        default_api_key = os.getenv("DEEPSEEK_API_KEY", "")
+        default_endpoint = os.getenv("DEEPSEEK_ENDPOINT", "https://api.deepseek.com/chat/completions")
+        default_model = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+        st.success("✅ 已切换到 DeepSeek（免费、国内）")
+        st.markdown("""
+        <div style='font-size: 0.85rem; padding: 12px; background: rgba(76, 175, 80, 0.2); border-radius: 5px; border: 1px solid rgba(76, 175, 80, 0.5);'>
+        <strong>✨ DeepSeek 优势：</strong><br>
+        • 🇨🇳 国内服务，速度快<br>
+        • 🆓 完全免费<br>
+        • 🎯 中文效果好<br>
+        • ⚙️ 配置简单
+        </div>
+        """, unsafe_allow_html=True)
+    elif platform == "通义千问":
+        default_api_key = os.getenv("QWEN_API_KEY", "")
+        default_endpoint = os.getenv("QWEN_ENDPOINT", "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions")
+        default_model = os.getenv("QWEN_MODEL", "qwen-turbo")
+        st.info("💡 已切换到通义千问（阿里云）")
+    elif platform == "Groq（免费）":
+        default_api_key = os.getenv("GROQ_API_KEY", "")
+        default_endpoint = os.getenv("GROQ_ENDPOINT", "https://api.groq.com/openai/v1/chat/completions")
+        default_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+        st.warning("🌐 已切换到 Groq（海外、免费）")
     else:
         default_api_key = ""
-        default_base_url = ""
+        default_endpoint = ""
         default_model = ""
-    
-    # 显示配置说明
-    if default_api_key:
-        st.info("✅ API Key 已配置，无需手动输入")
-    else:
-        st.info("💡 请在下方的 API Key 输入框中输入您的 API Key")
     
     st.markdown("---")
     
@@ -275,67 +283,54 @@ with st.sidebar:
         value=default_api_key,
         type="password" if not default_api_key else "default",
         help="输入您的 API Key",
-        placeholder="pat_xxxxxxxxxx 或 sk-xxxxxxxxx"
+        placeholder="sk-xxxxxxxxx"
     )
     
-    base_url = st.text_input(
-        "Base URL",
-        value=default_base_url,
-        help="API Base URL",
-        placeholder="https://api.coze.cn/v1"
+    endpoint_url = st.text_input(
+        "API 端点 URL",
+        value=default_endpoint,
+        help="完整的 API 端点 URL",
+        placeholder="https://api.xxxx.com/v1/chat/completions"
     )
     
     model = st.text_input(
-        "模型名称 / Bot ID",
+        "模型名称",
         value=default_model,
-        help="模型名称或 Bot ID",
-        placeholder="coze-pro 或 bot_id"
+        help="模型名称",
+        placeholder="model-name"
     )
     
-    # 平台说明
     st.markdown("---")
-    st.markdown("### 📋 平台说明")
+    st.markdown("### 💡 快速配置")
     
-    if platform == "Coze（扣子）":
-        st.markdown("""
-        **Coze（扣子）配置：**
-        
-        1. 访问：https://www.coze.cn/open/api
-        2. 获取 API Key
-        3. Base URL: `https://api.coze.cn/v1`
-        4. 模型名称：`coze-pro` 或 Bot ID
-        
-        **优势：**
-        - ✅ 免费额度
-        - ✅ 中文优化
-        - ✅ 配置简单
-        """)
-    elif platform == "OpenAI":
-        st.markdown("""
-        **OpenAI 配置：**
-        
-        1. 访问：https://platform.openai.com/api-keys
-        2. 获取 API Key
-        3. Base URL: `https://api.openai.com/v1`
-        4. 模型名称：`gpt-4o-mini`
-        
-        **优势：**
-        - ✅ 最稳定
-        - ✅ 效果最好
-        - ✅ 文档完善
-        """)
-    elif platform == "火山方舟":
-        st.markdown("""
-        **火山方舟配置：**
-        
-        1. 访问：https://console.volcengine.com/ark
-        2. 获取 API Key
-        3. Base URL: `https://ark.cn-beijing.volces.com/v3`
-        4. 模型名称：`doubao-pro-32k`
-        
-        **注意：**
-        ⚠️ 配置较复杂，建议使用 Coze 或 OpenAI
-        """)
+    if platform == "DeepSeek（推荐）":
+        st.code("""
+平台: DeepSeek（推荐）
+API Key: sk-xxxxxxxxxxxxxxxxxxxx
+端点: https://api.deepseek.com/chat/completions
+模型: deepseek-chat
+
+获取方式:
+1. 访问 https://platform.deepseek.com/
+2. 注册登录
+3. 左侧点击 "API Keys"
+4. 创建 API Key
+5. 完全免费！
+        """, language="text")
+    elif platform == "通义千问":
+        st.code("""
+平台: 通义千问
+API Key: sk-xxxxxxxxxxxxxxxxxxxx
+端点: https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
+模型: qwen-turbo
+        """, language="text")
+    elif platform == "Groq（免费）":
+        st.code("""
+平台: Groq
+API Key: gsk_xxxxxxxxxxxxxxxxxxxxx
+端点: https://api.groq.com/openai/v1/chat/completions
+模型: llama-3.3-70b-versatile
+        """, language="text")
     
     st.markdown("---")
     st.markdown("""
@@ -384,9 +379,13 @@ if generate_clicked:
         st.error("❌ 请填写所有字段！")
     elif not api_key:
         st.error("❌ 请在侧边栏配置 API Key！")
+    elif not endpoint_url:
+        st.error("❌ 请在侧边栏配置 API 端点 URL！")
+    elif not model:
+        st.error("❌ 请在侧边栏配置模型名称！")
     else:
         # 显示加载状态
-        with st.spinner("正在生成教案，请稍候..."):
+        with st.spinner(f"正在使用 {platform} 生成教案，请稍候..."):
             try:
                 # 调用 API 生成教案
                 lesson_plan = generate_lesson_plan(
@@ -394,99 +393,96 @@ if generate_clicked:
                     class_hours=class_hours,
                     teaching_objectives=teaching_objectives,
                     api_key=api_key,
-                    base_url=base_url,
+                    endpoint_url=endpoint_url,
                     model=model
                 )
                 
-                # 显示结果
-                st.markdown("### 生成的教案")
-                st.markdown(f'<div class="result-box">{lesson_plan}</div>', unsafe_allow_html=True)
+                if lesson_plan and len(lesson_plan) > 10:
+                    # 显示结果
+                    st.markdown("### 生成的教案")
+                    st.markdown(f'<div class="result-box">{lesson_plan}</div>', unsafe_allow_html=True)
+                    
+                    # 下载按钮
+                    st.download_button(
+                        label="📥 下载教案",
+                        data=lesson_plan,
+                        file_name=f"{course_topic}教案.md",
+                        mime="text/markdown"
+                    )
+                else:
+                    st.warning("⚠️ 生成的内容为空，请检查配置")
+                    st.info(f"返回内容: {lesson_plan}")
                 
-                # 下载按钮
-                st.download_button(
-                    label="📥 下载教案",
-                    data=lesson_plan,
-                    file_name=f"{course_topic}教案.md",
-                    mime="text/markdown"
-                )
-                
+            except requests.exceptions.HTTPError as e:
+                st.error(f"❌ 请求失败：{str(e)}")
+                st.info(f"💡 当前配置：")
+                st.code(f"""
+平台: {platform}
+端点: {endpoint_url}
+模型: {model}
+                """, language="text")
+                st.warning("⚠️ 请检查 API Key、端点 URL 和模型名称是否正确")
             except Exception as e:
                 st.error(f"❌ 生成失败：{str(e)}")
-                st.info(f"💡 当前使用平台：{platform}")
-                st.info("💡 请检查 API Key、Base URL 和模型名称是否正确")
-                if platform == "火山方舟":
-                    st.warning("⚠️ 火山方舟配置较复杂，建议切换到 Coze 或 OpenAI")
+                st.info(f"💡 请检查所有配置是否正确")
 
 
 # 使用说明
 with st.expander("💡 使用说明"):
     st.markdown("""
-    ### 如何使用
+    ### 🎯 推荐：使用 DeepSeek（免费、国内）
     
-    1. **选择平台**：
-       - 在左侧边栏选择使用的 AI 平台
-       - 推荐：Coze（扣子）或 OpenAI
+    **优势：**
+    - ✅ 完全免费
+    - ✅ 国内服务，速度快
+    - ✅ 中文效果好
+    - ✅ 配置简单，3 分钟搞定
     
-    2. **配置 API**：
-       - 输入 API Key
-       - 输入 Base URL（会自动填充默认值）
-       - 输入模型名称（会自动填充默认值）
+    **配置步骤：**
+    1. 访问：https://platform.deepseek.com/
+    2. 注册登录
+    3. 左侧点击 "API Keys"
+    4. 点击 "创建 API Key"
+    5. 复制 API Key
+    6. 在应用中选择 "DeepSeek（推荐）"
+    7. 粘贴 API Key
+    8. 生成教案
     
-    3. **输入课程信息**：
-       - 课程主题：例如"分数的加减法"
-       - 课时：例如"2课时（90分钟）"
-       - 教学目标：详细描述教学目标
-    
-    4. **生成教案**：
-       - 点击"✨ 生成教案"按钮
-       - 等待生成完成
-       - 可以下载为 Markdown 文件
-    
-    ### 平台对比
-    
-    | 平台 | 免费额度 | 中文支持 | 稳定性 | 推荐度 |
-    |------|---------|---------|--------|--------|
-    | **Coze（扣子）** | ✅ 有 | ✅ 优秀 | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ |
-    | **OpenAI** | ⚠️ 付费 | ✅ 优秀 | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
-    | **火山方舟** | ✅ 有 | ✅ 优秀 | ⭐⭐⭐ | ⭐⭐ |
-    
-    ### 如何获取 Coze API Key
-    
-    1. 访问：https://www.coze.cn/open/api
-    2. 登录/注册 Coze 账号
-    3. 点击"个人访问令牌"
-    4. 创建令牌
-    5. 复制保存
-    
-    ### Coze 配置示例
-    
+    **DeepSeek 配置示例：**
     ```
-    平台: Coze（扣子）
-    API Key: pat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-    Base URL: https://api.coze.cn/v1
-    模型: coze-pro
+    平台: DeepSeek（推荐）
+    API Key: sk-xxxxxxxxxxxxxxxxxxxx
+    端点: https://api.deepseek.com/chat/completions
+    模型: deepseek-chat
     ```
     
-    ### 如何获取 OpenAI API Key
+    ### 📊 其他平台
     
-    1. 访问：https://platform.openai.com/api-keys
-    2. 注册/登录 OpenAI 账号
-    3. 点击 "Create new secret key"
-    4. 复制保存
+    **通义千问（阿里云）**
+    - 有免费额度
+    - 中文效果好
+    - 国内服务
     
-    ### OpenAI 配置示例
+    **Groq（海外）**
+    - 完全免费
+    - 速度超快
+    - 海外服务
     
-    ```
-    平台: OpenAI
-    API Key: sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-    Base URL: https://api.openai.com/v1
-    模型: gpt-4o-mini
-    ```
+    ### 💡 常见问题
     
-    ### 注意事项
+    **Q: DeepSeek 真的免费吗？**
     
-    - Coze 有免费额度，适合测试和日常使用
-    - OpenAI 需要付费，但效果最稳定
-    - 火山方舟配置复杂，不推荐新手使用
-    - API Key 请妥善保管，不要泄露
+    A: 是的，完全免费！目前没有收费计划。
+    
+    **Q: DeepSeek 中文效果好吗？**
+    
+    A: 非常好！专门针对中文优化。
+    
+    **Q: 需要绑定信用卡吗？**
+    
+    A: 不需要！手机号注册即可。
+    
+    **Q: 跟 OpenAI 比怎么样？**
+    
+    A: 中文教案生成效果相当，而且免费！
     """)
